@@ -209,23 +209,6 @@ cp .env.example .env       # Configure VITE_API_URL
 npm run dev                # Inicia em http://localhost:5173
 ```
 
-### Variáveis de Ambiente
-
-**Backend (`.env`)**
-```env
-DATABASE_URL="postgresql://user:password@localhost:5432/clinicafam"
-JWT_SECRET="seu_segredo_jwt"
-JWT_EXPIRES_IN="7d"
-PORT=3001
-```
-
-**Frontend (`.env`)**
-```env
-VITE_API_URL=http://localhost:3001
-VITE_SOCKET_URL=http://localhost:3001
-```
-
----
 
 ## 📅 Cronograma
 
