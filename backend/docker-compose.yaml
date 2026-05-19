@@ -1,19 +1,20 @@
-version: latest
+version: "7.0"
+
 services:
   backend:
     build: .
     ports:
       - "3000:3000"
     environment:
-      - DATABASE_URL=postgresql://postgres:1234@db:5432/mydb
+      - DATABASE_URL=postgresql://postgres:1234@db:5432/ClinicaFam?schema=public
     depends_on:
       - db
   db:
     image: postgres:latest
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=mydb
+      - POSTGRES_PASSWORD=1234
+      - POSTGRES_DB=ClinicaFam
     ports:
       - "5432:5432"
 

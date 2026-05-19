@@ -1,20 +1,170 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider        = "prisma-client"
+  output          = "../generated/prisma"
+  previewFeatures = ["partialIndexes"]
 }
 
 datasource db {
   provider = "postgresql"
 }
 
-model User{
-  id String @id @default(uuid()) 
-  name String
-  email String
-  password String
+model agendamento {
+  id                String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  paciente_id       String                  @db.Uuid
+  medico_id         String                  @db.Uuid
+  data_hora         DateTime                @db.Timestamptz(6)
+  status            status_agendamento_enum @default(pendente)
+  tipo_consulta     tipo_consulta_enum      @default(presencial)
+  link_teleconsulta String?
+  medico            medico                  @relation(fields: [medico_id], references: [id], onUpdate: NoAction)
+  paciente          paciente                @relation(fields: [paciente_id], references: [id], onUpdate: NoAction)
+  consulta          consulta?
+
+  @@index([data_hora], map: "idx_agendamento_data_hora")
+  @@index([medico_id], map: "idx_agendamento_medico")
+  @@index([paciente_id], map: "idx_agendamento_paciente")
+  @@index([status], map: "idx_agendamento_status")
+}
+
+model consulta {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  agendamento_id String      @unique @db.Uuid
+  notas          String?
+  diagnostico    String?
+  prescricao     String?
+  data_realizada DateTime    @default(now()) @db.Timestamptz(6)
+  agendamento    agendamento @relation(fields: [agendamento_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  exame          exame[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model disponibilidade {
+  id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  medico_id   String          @db.Uuid
+  dia_semana  dia_semana_enum
+  hora_inicio DateTime        @db.Time(6)
+  hora_fim    DateTime        @db.Time(6)
+  ativo       Boolean         @default(true)
+  medico      medico          @relation(fields: [medico_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([medico_id], map: "idx_disponibilidade_medico")
+}
+
+model exame {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  consulta_id String   @db.Uuid
+  paciente_id String   @db.Uuid
+  tipo        String   @db.VarChar(100)
+  arquivo_url String?
+  data_upload DateTime @default(now()) @db.Timestamptz(6)
+  consulta    consulta @relation(fields: [consulta_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  paciente    paciente @relation(fields: [paciente_id], references: [id], onUpdate: NoAction)
+
+  @@index([consulta_id], map: "idx_exame_consulta")
+  @@index([paciente_id], map: "idx_exame_paciente")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model financeiro {
+  id          String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  paciente_id String                 @db.Uuid
+  descricao   String
+  valor       Decimal                @db.Decimal(10, 2)
+  status      status_financeiro_enum @default(pendente)
+  data_venc   DateTime               @db.Date
+  paciente    paciente               @relation(fields: [paciente_id], references: [id], onUpdate: NoAction)
+
+  @@index([data_venc], map: "idx_financeiro_data_venc")
+  @@index([paciente_id], map: "idx_financeiro_paciente")
+  @@index([status], map: "idx_financeiro_status")
+}
+
+model medico {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  usuario_id      String            @unique @db.Uuid
+  crm             String            @unique @db.VarChar(20)
+  especialidade   String            @db.VarChar(100)
+  bio             String?
+  foto_url        String?
+  agendamento     agendamento[]
+  disponibilidade disponibilidade[]
+  usuario         usuario           @relation(fields: [usuario_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model mensagem {
+  id                                        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  remetente_id                              String   @db.Uuid
+  destinatario_id                           String   @db.Uuid
+  conteudo                                  String
+  lida                                      Boolean  @default(false)
+  created_at                                DateTime @default(now()) @db.Timestamptz(6)
+  usuario_mensagem_destinatario_idTousuario usuario  @relation("mensagem_destinatario_idTousuario", fields: [destinatario_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  usuario_mensagem_remetente_idTousuario    usuario  @relation("mensagem_remetente_idTousuario", fields: [remetente_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([destinatario_id], map: "idx_mensagem_destinatario")
+  @@index([lida], map: "idx_mensagem_lida", where: raw("(lida = false)"))
+  @@index([remetente_id], map: "idx_mensagem_remetente")
+}
+
+model paciente {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  usuario_id  String        @unique @db.Uuid
+  cpf         String        @unique @db.VarChar(14)
+  data_nasc   DateTime      @db.Date
+  endereco    String?
+  convenio    String?       @db.VarChar(100)
+  agendamento agendamento[]
+  exame       exame[]
+  financeiro  financeiro[]
+  usuario     usuario       @relation(fields: [usuario_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model usuario {
+  id                                         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome                                       String     @db.VarChar(150)
+  email                                      String     @unique @db.VarChar(255)
+  senha_hash                                 String
+  role                                       role_enum  @default(paciente)
+  telefone                                   String?    @db.VarChar(20)
+  created_at                                 DateTime   @default(now()) @db.Timestamptz(6)
+  medico                                     medico?
+  mensagem_mensagem_destinatario_idTousuario mensagem[] @relation("mensagem_destinatario_idTousuario")
+  mensagem_mensagem_remetente_idTousuario    mensagem[] @relation("mensagem_remetente_idTousuario")
+  paciente                                   paciente?
+}
+
+enum dia_semana_enum {
+  segunda
+  terca
+  quarta
+  quinta
+  sexta
+  sabado
+  domingo
+}
+
+enum role_enum {
+  admin
+  medico
+  paciente
+}
+
+enum status_agendamento_enum {
+  pendente
+  confirmado
+  cancelado
+  realizado
+}
+
+enum status_financeiro_enum {
+  pendente
+  pago
+  vencido
+  cancelado
+}
+
+enum tipo_consulta_enum {
+  presencial
+  teleconsulta
 }
